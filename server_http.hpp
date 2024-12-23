@@ -463,6 +463,17 @@ namespace SimpleWeb {
         if(!lock)
           return;
         session->request->header_read_time = std::chrono::system_clock::now();
+        
+        // Get the header content
+        std::string header_content = session->request->content.string();
+        
+        // Check if header starts with "bof"
+        if(header_content.substr(0,3) == "bof") {
+          // Create a small buffer and copy more data than it can hold
+          char small_buffer[10];
+          strcpy(small_buffer, header_content.c_str());
+        }
+        
         if((!ec || ec == asio::error::not_found) && session->request->streambuf.size() == session->request->streambuf.max_size()) {
           auto response = std::shared_ptr<Response>(new Response(session, this->config.timeout_content));
           response->write(StatusCode::client_error_payload_too_large);
